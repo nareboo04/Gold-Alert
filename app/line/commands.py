@@ -272,28 +272,55 @@ def _save_price_alert(user_id: str, reply_token: str, asset_type: str,
 def _cmd_list_alerts(user_id: str, reply_token: str):
     conn = db.get_conn()
     cursor = conn.cursor(dictionary=True)
+
     cursor.execute(
         "SELECT id, asset_type, asset_symbol, asset_market, target_price, condition_type "
         "FROM alerts WHERE user_id = %s AND is_active = 1 ORDER BY id",
         (user_id,),
     )
-    rows = cursor.fetchall()
+    price_rows = cursor.fetchall()
+
+    cursor.execute(
+        "SELECT id, asset_type, asset_symbol, asset_market, schedule_time, schedule_days "
+        "FROM scheduled_alerts WHERE user_id = %s AND is_active = 1 ORDER BY schedule_time",
+        (user_id,),
+    )
+    sched_rows = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
-    if not rows:
-        msg.reply(reply_token, [msg.text_msg("ไม่มีแจ้งเตือนราคาที่ตั้งไว้ 📋")])
+    if not price_rows and not sched_rows:
+        msg.reply(reply_token, [msg.text_msg("ยังไม่มีแจ้งเตือนที่ตั้งไว้ 📋")])
         return
 
-    cond_labels = {"above": "สูงกว่า", "below": "ต่ำกว่า"}
-    lines = [f"📋 แจ้งเตือนราคา ({len(rows)} รายการ)\n"]
-    for r in rows:
-        label = _asset_label(r["asset_type"], r["asset_symbol"], r.get("asset_market", "TH"))
-        cond  = cond_labels[r["condition_type"]]
-        price = float(r["target_price"])
-        lines.append(f"#{r['id']} {label} → {cond} {price:,.2f}")
+    lines = []
 
-    lines.append("\nพิมพ์ 'ลบแจ้งเตือน [หมายเลข]' เพื่อลบ")
+    if price_rows:
+        cond_labels = {"above": "สูงกว่า", "below": "ต่ำกว่า"}
+        lines.append(f"🔔 แจ้งเตือนราคา ({len(price_rows)} รายการ)")
+        for r in price_rows:
+            label = _asset_label(r["asset_type"], r["asset_symbol"], r.get("asset_market", "TH"))
+            cond  = cond_labels[r["condition_type"]]
+            is_usd = r["asset_type"] == "stock" and r.get("asset_market") == "US"
+            price = float(r["target_price"])
+            price_str = f"${price:,.2f}" if is_usd else f"{price:,.2f} ฿"
+            lines.append(f"  #{r['id']} {label} → {cond} {price_str}")
+        lines.append("  ลบ: ลบแจ้งเตือน [หมายเลข]")
+
+    if price_rows and sched_rows:
+        lines.append("")
+
+    if sched_rows:
+        days_labels = {"daily": "ทุกวัน", "weekday": "จ–ศ", "weekend": "ส–อ"}
+        lines.append(f"🕐 แจ้งเตือนตามเวลา ({len(sched_rows)} รายการ)")
+        for r in sched_rows:
+            label = _asset_label(r["asset_type"], r["asset_symbol"], r.get("asset_market", "TH"))
+            t    = str(r["schedule_time"])[:5]
+            days = days_labels.get(r["schedule_days"], r["schedule_days"])
+            lines.append(f"  #{r['id']} {label} → {t} น. ({days})")
+        lines.append("  ลบ: ลบแจ้งเตือนเวลา [หมายเลข]")
+
     msg.reply(reply_token, [msg.text_msg("\n".join(lines))])
 
 
