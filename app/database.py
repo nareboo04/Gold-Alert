@@ -1,9 +1,17 @@
+import time
 import mysql.connector
 from app.config import DB_CONFIG
 
 
 def get_conn():
-    return mysql.connector.connect(**DB_CONFIG)
+    for attempt in range(1, 11):
+        try:
+            return mysql.connector.connect(**DB_CONFIG)
+        except mysql.connector.Error as e:
+            print(f"[db] connect attempt {attempt}/10 failed: {e}")
+            if attempt == 10:
+                raise
+            time.sleep(3)
 
 
 def init_db():

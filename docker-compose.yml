@@ -14,7 +14,8 @@ services:
       - TZ=Asia/Bangkok
       - MYSQL_HOST=mysql
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   main:
     build:
@@ -27,7 +28,8 @@ services:
       - TZ=Asia/Bangkok
       - MYSQL_HOST=mysql
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   mysql:
     build:
@@ -40,6 +42,12 @@ services:
       MYSQL_DATABASE: users_db
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
