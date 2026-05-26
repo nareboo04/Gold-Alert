@@ -1,61 +1,65 @@
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
-from typing import List
-import mysql.connector
-import os
+from app import database as db
+from app.line import commands
 
 app = FastAPI(docs_url="/documentation", redoc_url=None)
 
-# เชื่อมต่อกับฐานข้อมูล MySQL
-def get_db_connection():
-    return mysql.connector.connect(
-        host=os.getenv('MYSQL_HOST'),
-        port=os.getenv('MYSQL_PORT'),
-        user=os.getenv('MYSQL_USER'),
-        password=os.getenv('MYSQL_PASSWORD'),
-        database=os.getenv('MYSQL_DATABASE')
-    )
+# Ensure tables exist on startup
+db.init_db()
 
-# Ensure the table exists
-conn = get_db_connection()
-cursor = conn.cursor()
-cursor.execute('''CREATE TABLE IF NOT EXISTS users (user_id VARCHAR(255) PRIMARY KEY)''')
-conn.commit()
-conn.close()
-
-class EventSource(BaseModel):
-    userId: str
-    type: str
-
-class Event(BaseModel):
-    type: str
-    replyToken: str
-    source: EventSource
-    timestamp: int
-
-class WebhookRequest(BaseModel):
-    events: List[Event]
 
 @app.post("/webhook")
 async def webhook(request: Request):
-    data = await request.json()
-    webhook_request = WebhookRequest(**data)
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    body = await request.json()
 
-    for event in webhook_request.events:
-        if event.type == "follow":
-            user_id = event.source.userId
-            try:
-                cursor.execute('INSERT IGNORE INTO users (user_id) VALUES (%s)', (user_id,))
-                conn.commit()
-                print(f"New follower: {user_id}")
-            except mysql.connector.Error as err:
-                print(f"Error: {err}")
-                conn.rollback()
-    
-    cursor.close()
-    conn.close()
+    for event in body.get("events", []):
+        event_type  = event.get("type")
+        reply_token = event.get("replyToken", "")
+        source      = event.get("source", {})
+        user_id     = source.get("userId")
 
-    return {"status": "success"}
+        if not user_id:
+            continue
+
+        if event_type == "follow":
+            _register_user(user_id)
+
+        elif event_type == "unfollow":
+            _remove_user(user_id)
+
+        elif event_type == "message":
+            msg = event.get("message", {})
+            if msg.get("type") == "text":
+                text = msg.get("text", "").strip()
+                if text:
+                    commands.handle(user_id, reply_token, text)
+
+    return {"status": "ok"}
+
+
+def _register_user(user_id: str):
+    try:
+        conn = db.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("INSERT IGNORE INTO users (user_id) VALUES (%s)", (user_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"[webhook] follow: {user_id}")
+    except Exception as e:
+        print(f"[webhook] register error: {e}")
+
+
+def _remove_user(user_id: str):
+    try:
+        conn = db.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+        # Deactivate all alerts for unfollowed user
+        cursor.execute("UPDATE alerts SET is_active = 0 WHERE user_id = %s", (user_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"[webhook] unfollow: {user_id}")
+    except Exception as e:
+        print(f"[webhook] remove error: {e}")

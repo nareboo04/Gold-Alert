@@ -1,6 +1,7 @@
 fastapi[standard]==0.112.0
-requests >= 2.32.3
-beautifulsoup4 >= 4.12.3
-python-dotenv >= 1.0.1
+requests>=2.32.3
+beautifulsoup4>=4.12.3
+python-dotenv>=1.0.1
 pydantic>=2.7.0
 mysql-connector-python
+yfinance>=0.2.40

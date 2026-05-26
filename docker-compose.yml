@@ -9,6 +9,7 @@ services:
     ports:
       - "5000:5000"
     environment:
+      - TZ=Asia/Bangkok
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_USER=root
@@ -23,6 +24,7 @@ services:
       dockerfile: Dockerfile.main
     restart: always
     environment:
+      - TZ=Asia/Bangkok
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_USER=root
@@ -37,6 +39,7 @@ services:
       dockerfile: Dockerfile.mysql
     restart: always
     environment:
+      TZ: Asia/Bangkok
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: users_db
     ports:
@@ -48,5 +51,6 @@ services:
     ports:
       - "8080:80"
     environment:
+      TZ: Asia/Bangkok
       PMA_HOST: mysql
       MYSQL_ROOT_PASSWORD: password
