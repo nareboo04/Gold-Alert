@@ -1,31 +1,16 @@
 import time
 import datetime
 from app import database as db
-from app.config import ALERT_CHECK_INTERVAL, DAILY_REPORT_HOUR
-from app.services.alert_checker import (
-    check_price_alerts,
-    check_scheduled_alerts,
-    send_daily_gold_report,
-)
-
-
-def get_all_user_ids() -> list[str]:
-    conn = db.get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM users")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return [r[0] for r in rows]
+from app.config import ALERT_CHECK_INTERVAL
+from app.services.alert_checker import check_price_alerts, check_scheduled_alerts
 
 
 def main():
     print("[main] initializing database...")
     db.init_db()
-    print(f"[main] schedule check: every 60s | price check: every {ALERT_CHECK_INTERVAL}s | daily report: {DAILY_REPORT_HOUR}:00")
+    print(f"[main] schedule check: every 60s | price check: every {ALERT_CHECK_INTERVAL}s")
 
-    last_price_check  = 0.0
-    last_daily_date: datetime.date | None = None
+    last_price_check = 0.0
 
     while True:
         now = datetime.datetime.now()
@@ -44,16 +29,6 @@ def main():
             except Exception as e:
                 print(f"[main] price check error: {e}")
             last_price_check = time.monotonic()
-
-        # ── Daily gold report ────────────────────────────────────────────────
-        if now.hour == DAILY_REPORT_HOUR and now.minute == 0:
-            if last_daily_date != now.date():
-                print("[main] sending daily gold report")
-                try:
-                    send_daily_gold_report(get_all_user_ids())
-                except Exception as e:
-                    print(f"[main] daily report error: {e}")
-                last_daily_date = now.date()
 
         time.sleep(60)
 

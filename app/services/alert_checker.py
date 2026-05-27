@@ -3,7 +3,6 @@ Alert checker service.
 
 check_price_alerts()    → run every 5 minutes — fire when price crosses target
 check_scheduled_alerts() → run every minute   — fire at the scheduled time
-send_daily_gold_report() → run once at DAILY_REPORT_HOUR
 """
 
 import datetime
@@ -115,18 +114,6 @@ def check_scheduled_alerts():
         conn.commit()
         cursor.close()
         conn.close()
-
-
-# ── Daily gold report ─────────────────────────────────────────────────────────────
-
-def send_daily_gold_report(users: list[str]):
-    data = gold.fetch()
-    if not data:
-        print("[daily report] failed to fetch gold price")
-        return
-    bubble = msg.build_gold_bubble(data)
-    for user_id in users:
-        msg.push(user_id, [msg.flex_msg("ราคาทองคำประจำวัน", bubble)])
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────────

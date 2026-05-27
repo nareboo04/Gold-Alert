@@ -19,4 +19,3 @@ DB_CONFIG: dict = {
 }
 
 ALERT_CHECK_INTERVAL: int = int(os.getenv('ALERT_CHECK_INTERVAL', 300))  # seconds
-DAILY_REPORT_HOUR: int = int(os.getenv('DAILY_REPORT_HOUR', 18))         # 18 = 6 PM
